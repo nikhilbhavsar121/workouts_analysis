@@ -11,6 +11,7 @@ $ apt-get install -y migrate
 Create the database with name workoutdb
 
 Run the migration
+
 migrate -path db/migration -database  "mysql://Username:password@tcp(127.0.0.1:3306)/workoutdb" -verbose up
 
 set .env file
