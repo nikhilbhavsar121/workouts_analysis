@@ -7,20 +7,24 @@ import (
 )
 
 func SetupRoutes(db *sql.DB) {
+	//TODO: send id as path param
+
 	http.HandleFunc("/workouts", func(w http.ResponseWriter, r *http.Request) {
-		models.GetWorkoutsHandler(w, r, db)
+		switch r.Method {
+		case http.MethodGet:
+			models.GetWorkoutsHandler(w, r, db)
+		case http.MethodPost:
+			models.CreateWorkoutHandler(w, r, db)
+		case http.MethodPut:
+			models.UpdateWorkout(w, r, db)
+		case http.MethodDelete:
+			models.DeleteWorkout(w, r, db)
+		default:
+			http.NotFound(w, r)
+		}
 	})
-	http.HandleFunc("/workouts/", func(w http.ResponseWriter, r *http.Request) {
+	//TODO: send id as path param
+	http.HandleFunc("/getworkouts", func(w http.ResponseWriter, r *http.Request) {
 		models.GetWorkoutHandlerByID(w, r, db)
 	})
-	http.HandleFunc("/workouts", func(w http.ResponseWriter, r *http.Request) {
-		models.CreateWorkoutHandler(w, r, db)
-	})
-	http.HandleFunc("/workouts/", func(w http.ResponseWriter, r *http.Request) {
-		models.UpdateWorkout(w, r, db)
-	})
-	http.HandleFunc("/workouts/", func(w http.ResponseWriter, r *http.Request) {
-		models.DeleteWorkout(w, r, db)
-	})
-
 }

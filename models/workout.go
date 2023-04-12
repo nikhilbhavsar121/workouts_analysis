@@ -17,15 +17,6 @@ type Workout struct {
 	EndTime   string `json:"end_time"`
 }
 
-// Define the MySQL database connection string
-const (
-	DBHost  = "localhost"
-	DBPort  = ":3306"
-	DBUser  = "root"
-	DBPass  = "password"
-	DBDbase = "workouts"
-)
-
 // Handler for GET /workouts
 func GetWorkoutsHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	rows, err := db.Query("SELECT id, steps, calories, start_time, end_time FROM workouts")
@@ -82,45 +73,50 @@ func GetWorkoutHandlerByID(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 // Handler for POST /workouts
 func CreateWorkoutHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
-	// Parse the request body to get the workout data
-	var workout Workout
-	err := json.NewDecoder(r.Body).Decode(&workout)
+	var workouts []Workout
+	err := json.NewDecoder(r.Body).Decode(&workouts)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Insert the workout into the database
-	result, err := db.ExecContext(r.Context(), `
-		INSERT INTO workouts (steps, calories, start_time, end_time)
-		VALUES (?, ?, ?, ?)
-	`, workout.Steps, workout.Calories, workout.StartTime, workout.EndTime)
-	if err != nil {
-		http.Error(w, "Failed to create workout", http.StatusInternalServerError)
-		return
-	}
+	for _, workout := range workouts {
 
-	// Get the ID of the newly created workout
-	id, err := result.LastInsertId()
-	if err != nil {
-		http.Error(w, "Failed to get ID of created workout", http.StatusInternalServerError)
-		return
-	}
+		result, err := db.ExecContext(r.Context(), `
+			INSERT INTO workouts (steps, calories, start_time, end_time)
+			VALUES (?, ?, ?, ?)
+		`, workout.Steps, workout.Calories, workout.StartTime, workout.EndTime)
+		if err != nil {
+			http.Error(w, "Failed to create workout", http.StatusInternalServerError)
+			return
+		}
 
-	// Set the ID field of the workout object and write it to the response
-	workout.ID = int(id)
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(workout)
-	if err != nil {
-		http.Error(w, "Failed to encode workout JSON", http.StatusInternalServerError)
-		return
+		id, err := result.LastInsertId()
+		if err != nil {
+			http.Error(w, "Failed to get ID of created workout", http.StatusInternalServerError)
+			return
+		}
+
+		workout.ID = int(id)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		err = json.NewEncoder(w).Encode(workout)
+		if err != nil {
+			http.Error(w, "Failed to encode workout JSON", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
 // Create a function to handle deleting workout records
 func DeleteWorkout(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Parse the workout ID from the URL path
-	id := r.URL.Path[len("/workouts/"):]
+
+	vars := r.URL.Query()
+	id, err := strconv.Atoi(vars.Get("id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Delete the workout record from the database
 	stmt, err := db.Prepare("DELETE FROM workouts WHERE id=?")
@@ -145,19 +141,22 @@ func DeleteWorkout(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 // Create a function to handle updating workout records
 func UpdateWorkout(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Parse the workout ID from the URL path
-	id := r.URL.Path[len("/workouts/"):]
-
+	vars := r.URL.Query()
+	id, err := strconv.Atoi(vars.Get("id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	// Parse the workout data from the request body
 	var workout Workout
-	err := json.NewDecoder(r.Body).Decode(&workout)
+	err = json.NewDecoder(r.Body).Decode(&workout)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Update the workout record in the database
-	stmt, err := db.Prepare("UPDATE workouts SET steps=?, calories=?, workout_start_time=?, workout_end_time=? WHERE id=?")
+	stmt, err := db.Prepare("UPDATE workouts SET steps=?, calories=?, start_time=?, end_time=? WHERE id=?")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -172,6 +171,13 @@ func UpdateWorkout(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// dateStr := workout.StartTime
+	// layout := "2006-01-02 15:04:05"
+	// dt, _ := time.Parse(layout, dateStr)
+	// startDtStr := dt.Format("2006-01-02 15:00:00")
+	// endDtStr := dt.Format("2006-01-02 15:59:00")
+	// fmt.Println(startDtStr) // Output: 2023-04-07 22:00:00
+	// fmt.Println(endDtStr)   // Output: 2023-04-07 22:59:00
 
 	// Send a response back to the client
 	fmt.Fprintf(w, "Updated %d workout record(s)", rowsAffected)

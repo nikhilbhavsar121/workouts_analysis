@@ -2,11 +2,16 @@ package main
 
 import (
 	"aubergine_test/routes"
-	"database/sql"
+	"aubergine_test/tasks"
+	"aubergine_test/utils"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 type Workout struct {
@@ -17,17 +22,34 @@ type Workout struct {
 	EndTime   string `json:"end_time"`
 }
 
-var db *sql.DB
-
 func main() {
-	var err error
-	db, err = sql.Open("mysql", "root:Nikhil58@@tcp(127.0.0.1:3306)/workoutsdb")
-	if err != nil {
-		log.Fatal(err)
+	LoadConfig()
+
+	conn, dbErr := utils.GetDBConnection()
+
+	if dbErr != nil {
+		fmt.Println("Cannot connect to database", dbErr)
+		return
 	}
-	defer db.Close()
 
-	routes.SetupRoutes(db)
+	defer conn.Close()
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	routes.SetupRoutes(conn)
+	port := os.Getenv("PORT")
+	startWorkers()
+	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+func LoadConfig() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		fmt.Println("Error loading .env file", err)
+	}
+}
+
+func startWorkers() {
+	go tasks.DailyAggregationsRunEvery(time.Duration(1) * time.Hour)
+
+	go tasks.WeeklyAggregationsRunEvery(time.Duration(168) * time.Hour)
+
 }
