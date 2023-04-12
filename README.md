@@ -15,4 +15,5 @@ Run the migration
 migrate -path db/migration -database  "mysql://Username:password@tcp(127.0.0.1:3306)/workoutdb" -verbose up
 
 set .env file
+
 set the test db configuration in the test cases
